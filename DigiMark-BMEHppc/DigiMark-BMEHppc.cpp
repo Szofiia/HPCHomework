@@ -36,6 +36,13 @@ void processImageFromFile(Mat& I, char* fileName)
     Ip.copyTo(I);
 }
 
+// Create nxn Watermark image 
+void createWatermark(Mat& W, int n)
+{
+    RNG rng;
+    W = Mat(n, n, CV_32F);
+    cv::randu(W, 0, 1);
+}
 
 int main(int argc, char** argv)
 {
@@ -51,7 +58,19 @@ int main(int argc, char** argv)
     Mat I;
     processImageFromFile(I, argv[1]);
     imshow("Original Image", I);
-    
+
+    // Create Watermark
+    int n = 8;
+    Mat W;
+    createWatermark(W, n);
+
+    // Write into file, png conversion
+    Mat Iw;
+    W.convertTo(Iw, CV_8U, 255.0);
+    imwrite("watermark.png", Iw);
+
+    imshow("Watermark", Iw);
+
     waitKey(0);
     return 0;
 
