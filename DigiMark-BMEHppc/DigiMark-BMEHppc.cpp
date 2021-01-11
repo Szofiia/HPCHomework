@@ -111,10 +111,20 @@ int main(int argc, char** argv)
     vector<Mat> V;
     createBlocks(V, I, N);
 
-    // Reassemble blocks
-    Mat Is = cv::Mat::zeros(512, 512, CV_8UC1);
-    assembleBlocks(V, Is, n);
-    imshow("Assembled", Is);
+    // DCT on each block
+    vector<Mat> Vdct;
+    for (Mat Vi : V) {
+        Vi.convertTo(Vi, CV_32F, 1.0 / 255);
+        Mat Vti;
+        dct(Vi, Vti);
+        Vdct.push_back(Vti);
+    }
+
+    // Reassemble DCT
+    Mat Idct = cv::Mat::zeros(512, 512, CV_32F);
+    assembleBlocks(Vdct, Idct, n);
+    imwrite("dcts.png", Idct);
+    imshow("Assembled", Idct);
 
     waitKey(0);
     return 0;
