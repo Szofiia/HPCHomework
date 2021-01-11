@@ -80,6 +80,27 @@ void assembleBlocks(vector<Mat>& V, Mat& I, int n)
     }
 }
 
+// Place a watermark according to a strategy
+void placeWatermark(Mat& Vi, float W)
+{
+    // We exclude the DC component, that is
+    // the highest magnitude, always in the top-left corner
+    Mat temp;
+    Vi.copyTo(temp);
+    double min_val, max_val;
+    Point min_loc, max_loc;
+
+    minMaxLoc(Vi, &min_val, &max_val, &min_loc, &max_loc);
+    temp.at<float>(max_loc) = 0;
+
+    // Find highest magnitude coefficients
+    minMaxLoc(temp, &min_val, &max_val, &min_loc, &max_loc);
+
+    // Embed
+    int alpha = 0.5;
+    Vi.at<float>(max_loc) = Vi.at<float>(max_loc) + alpha * W;
+}
+
 int main(int argc, char** argv)
 {
     std::cout << "SS Watermarking\n";
@@ -125,6 +146,30 @@ int main(int argc, char** argv)
     assembleBlocks(Vdct, Idct, n);
     imwrite("dcts.png", Idct);
     imshow("Assembled", Idct);
+
+    // Place the Watermark in the most significant bits
+    // This is not a good algorithm, since we replace bits, instead 
+    // of calculating a reversible operation
+    for (int i = 0; i < Vdct.size(); i++) {
+        int row_num = (int)floor(i / n);
+        int col_num = i % n;
+        float w = W.at<float>(row_num, col_num);
+        placeWatermark(Vdct[i], w);
+    }
+
+    // Inverse dct
+    vector<Mat> D;
+    for (Mat Vti : Vdct) {
+        Mat Di;
+        idct(Vti, Di);
+        D.push_back(Di);
+    }
+
+    Mat Id = cv::Mat::zeros(512, 512, CV_32F);
+    assembleBlocks(D, Id, n);
+    Id.convertTo(Id, CV_8U, 255.0);
+    imwrite("lena_reassembled.png", Id);
+    imshow("Watermarked", Id);
 
     waitKey(0);
     return 0;
