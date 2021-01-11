@@ -3,27 +3,56 @@
 #include <opencv2/highgui.hpp>
 #include <iostream>
 
+
 using namespace cv;
 using namespace std;
 
-int main(int argc, char** argv)
+// Read image file from arguments
+void processImageFromFile(Mat& I, char* fileName)
 {
-    if (argc != 2)
-    {
-        cout << " Usage: " << argv[0] << " ImageToLoadAndDisplay" << endl;
-        return -1;
-    }
-    Mat image;
-    image = imread(argv[1], IMREAD_COLOR); // Read the file
+    // Read
+    Mat image = imread(fileName, IMREAD_GRAYSCALE);
+
     if (image.empty()) // Check for invalid input
     {
         cout << "Could not open or find the image" << std::endl;
+        exit(0);
+    }
+
+    // Padding for faster Fourier Transform
+    Mat Ip;
+    int M = getOptimalDFTSize(image.rows);
+    int N = getOptimalDFTSize(image.cols);
+
+    if (M != N) // Check for invalid input
+    {
+        cout << "Image width and height do not match" << std::endl;
+        exit(0);
+    }
+
+    copyMakeBorder(image, Ip, 0, M - image.rows, 0, N - image.cols, BORDER_CONSTANT, Scalar::all(0));
+
+    // Copy to I
+    Ip.copyTo(I);
+}
+
+
+int main(int argc, char** argv)
+{
+    std::cout << "SS Watermarking\n";
+
+    if (argc != 2)
+    {
+        cout << "Error: Image not added as an argument." << endl;
         return -1;
     }
-    namedWindow("Display window", WINDOW_AUTOSIZE); // Create a window for display.
-    imshow("Display window", image); // Show our image inside it.
-    waitKey(0); // Wait for a keystroke in the window
+
+    // Load image
+    Mat I;
+    processImageFromFile(I, argv[1]);
+    imshow("Original Image", I);
+    
+    waitKey(0);
     return 0;
 
-    std::cout << "Hello World!\n";
 }
