@@ -44,6 +44,42 @@ void createWatermark(Mat& W, int n)
     cv::randu(W, 0, 1);
 }
 
+// Separate I into NxN blocks in V 
+void createBlocks(vector<Mat>& V, Mat& I, int N)
+{
+    int M1 = I.rows;
+    int M2 = I.cols;
+
+    if (M1 != M2) // Check for invalid input
+    {
+        cout << "Image width and height do not match" << std::endl;
+        exit(0);
+    }
+
+    for (int i = 0; i < M1 - N + 1; i += N)
+    {
+        for (int j = 0; j < M1 - N + 1; j += N)
+        {
+            Rect frame = Rect(i, j, N, N);
+            Mat Vij = Mat(I, frame);
+            V.push_back(Vij);
+        }
+    }
+}
+
+// Re-assemble blocks
+void assembleBlocks(vector<Mat>& V, Mat& I, int n)
+{
+    for (int i = 0; i < V.size(); i++) {
+        int row_num = (int)floor(i / n);
+        int col_num = i % n;
+
+        Mat dst_roi = I(Rect(row_num * V[i].cols, col_num * V[i].rows, V[i].cols, V[i].rows));
+
+        V[i].copyTo(dst_roi);
+    }
+}
+
 int main(int argc, char** argv)
 {
     std::cout << "SS Watermarking\n";
@@ -68,8 +104,17 @@ int main(int argc, char** argv)
     Mat Iw;
     W.convertTo(Iw, CV_8U, 255.0);
     imwrite("watermark.png", Iw);
-
     imshow("Watermark", Iw);
+
+    // Divide image into N = width / n blocks, V = [v1, v2,...vN]
+    int N = I.rows / n;
+    vector<Mat> V;
+    createBlocks(V, I, N);
+
+    // Reassemble blocks
+    Mat Is = cv::Mat::zeros(512, 512, CV_8UC1);
+    assembleBlocks(V, Is, n);
+    imshow("Assembled", Is);
 
     waitKey(0);
     return 0;
