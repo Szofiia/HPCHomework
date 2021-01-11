@@ -114,7 +114,6 @@ int main(int argc, char** argv)
     // Load image
     Mat I;
     processImageFromFile(I, argv[1]);
-    imshow("Original Image", I);
 
     // Create Watermark
     int n = 8;
@@ -125,7 +124,6 @@ int main(int argc, char** argv)
     Mat Iw;
     W.convertTo(Iw, CV_8U, 255.0);
     imwrite("watermark.png", Iw);
-    imshow("Watermark", Iw);
 
     // Divide image into N = width / n blocks, V = [v1, v2,...vN]
     int N = I.rows / n;
@@ -145,7 +143,6 @@ int main(int argc, char** argv)
     Mat Idct = cv::Mat::zeros(512, 512, CV_32F);
     assembleBlocks(Vdct, Idct, n);
     imwrite("dcts.png", Idct);
-    imshow("Assembled", Idct);
 
     // Place the Watermark in the most significant bits
     // This is not a good algorithm, since we replace bits, instead 
@@ -169,7 +166,6 @@ int main(int argc, char** argv)
     assembleBlocks(D, Id, n);
     Id.convertTo(Id, CV_8U, 255.0);
     imwrite("lena_reassembled.png", Id);
-    imshow("Watermarked", Id);
 
     waitKey(0);
     return 0;
