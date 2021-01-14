@@ -3,12 +3,11 @@
 #include <cuda.h>
 #include <curand.h>
 #include <curand_kernel.h>
+#include <cublas_v2.h>
 
 #include <iostream>
 
 #include "Watermarking_CUDA.h"
-
-// Numer of threads
 
 // Cuda error handling
 #define CUDA_CALL(x) do { if((x) != cudaSuccess) { \
@@ -16,6 +15,10 @@
     return;}} while(0)
 
 #define CURAND_CALL(x) do { if((x)!=CURAND_STATUS_SUCCESS) { \
+    printf("Error at %s:%d\n",__FILE__,__LINE__);\
+    return;}} while(0)
+
+#define CUBLAS_CALL(x) do { if((x)!=CUBLAS_STATUS_SUCCESS) { \
     printf("Error at %s:%d\n",__FILE__,__LINE__);\
     return;}} while(0)
 
@@ -42,6 +45,30 @@ __global__ void generate_for_random(curandState* global_state, float* random_val
     float random = curand_uniform(&localState);
     random_values[idx] = random;
     global_state[idx] = localState;
+}
+
+// Adds a little to each pixel
+__global__ void add_watermark(float* data, int N)
+{
+    //extern __shared__ int sdata[];
+    
+    int tidx = threadIdx.x;
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    //sdata[tidx] = data[idx];
+    //__syncthreads();
+
+   /* for (unsigned int i = blockDim.x / 2; i > 0; i >>= 1)
+    {
+        if (tidx < i)
+        {
+
+            data[tidx] += 0.5f;
+        }
+        __syncthreads();
+    }*/
+
+    if (idx < N)
+        data[idx] += 0.5f;
 }
 
 // Calculates random values on the device and copies to the host,
@@ -106,4 +133,34 @@ void CalcRandWithDevAPI(float* host_data, int N)
     // Cleanup
     CUDA_CALL(cudaFree(dev_states));
     CUDA_CALL(cudaFree(dev_random_values));
+}
+
+// Calculates the watermark in the mos significant blocks
+//
+// host_data - the input container with values
+// N - size of the input container
+// w - the watermark
+// alpha - allpha for embedding the watermark
+void CalcWatermark(float* host_data, int N, float w, float alpha) 
+{
+    float *dev_data, *temp_data;
+    int max_index = 0;
+    cublasHandle_t my_handle;
+    CUBLAS_CALL(cublasCreate(&my_handle));
+    
+    // Allocate temporary for max
+    temp_data = new float[N * sizeof(float)];
+    memcpy(temp_data, host_data, N * sizeof(float));
+
+    CUDA_CALL(cudaMalloc((void**)&dev_data, N * sizeof(float)));
+
+    CUDA_CALL(cudaMemcpy(dev_data, host_data, N * sizeof(*host_data), cudaMemcpyHostToDevice));
+    CUBLAS_CALL(cublasIsamax(my_handle, N, dev_data, 1, &max_index));
+    temp_data[max_index] = 0;
+    //CUDA_CALL(cudaFree(dev_data));
+
+    CUDA_CALL(cudaMemcpy(dev_data, temp_data, N * sizeof(*host_data), cudaMemcpyHostToDevice));
+    CUBLAS_CALL(cublasIsamax(my_handle, N, dev_data, 1, &max_index));
+    host_data[max_index] = host_data[max_index] + alpha * w;
+    CUDA_CALL(cudaFree(dev_data));
 }

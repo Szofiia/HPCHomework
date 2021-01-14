@@ -100,7 +100,7 @@ void placeWatermark(Mat& Vi, float W)
     minMaxLoc(temp, &min_val, &max_val, &min_loc, &max_loc);
 
     // Embed
-    int alpha = 0.5;
+    float alpha = 0.5;
     Vi.at<float>(max_loc) = Vi.at<float>(max_loc) + alpha * W;
 }
 
@@ -118,6 +118,9 @@ int main(int argc, char** argv)
     Mat I;
     processImageFromFile(I, argv[1]);
 
+    Mat converted;
+    I.convertTo(converted, CV_32F, 1.0 / 255);
+    
     // Create Watermark (Serial)
     int n = 8;
     Mat W;
@@ -162,11 +165,13 @@ int main(int argc, char** argv)
 
     // DCT on each block
     vector<Mat> Vdct;
+    vector<Mat> Vcdct;
     for (Mat Vi : V) {
         Vi.convertTo(Vi, CV_32F, 1.0 / 255);
         Mat Vti;
         dct(Vi, Vti);
         Vdct.push_back(Vti);
+        Vcdct.push_back(Vti);
     }
 
     // Reassemble DCT
@@ -178,16 +183,17 @@ int main(int argc, char** argv)
     imwrite("dcts.png", Iwdct);
 
     // Place the Watermark in the most significant bits
-    // This is not a good algorithm, since we replace bits, instead 
-    // of calculating a reversible operation
+    begin = std::chrono::steady_clock::now();
     for (int i = 0; i < Vdct.size(); i++) {
         int row_num = (int)floor(i / n);
         int col_num = i % n;
         float w = W.at<float>(row_num, col_num);
         placeWatermark(Vdct[i], w);
     }
+    end = std::chrono::steady_clock::now();
+    std::cout << "Host time difference = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
 
-    // Inverse dct
+    // Inverse DCT
     vector<Mat> D;
     for (Mat Vti : Vdct) {
         Mat Di;
@@ -199,6 +205,35 @@ int main(int argc, char** argv)
     assembleBlocks(D, Id, n);
     Id.convertTo(Id, CV_8U, 255.0);
     imwrite("lena_reassembled.png", Id);
+    imshow("Host Watermarked", Id);
+
+    vector<float> Data;
+
+    begin = std::chrono::steady_clock::now();
+    for (int i = 0; i < Vcdct.size(); i++) {
+        int row_num = (int)floor(i / n);
+        int col_num = i % n;
+        float w = W.at<float>(row_num, col_num);
+
+        Data.assign((float*)Vcdct[i].datastart, (float*)Vcdct[i].dataend);
+        CalcWatermark(Data.data(), Data.size(), w, 1.2);
+        memcpy(Vcdct[i].data, Data.data(), Data.size() * sizeof(float));
+    }
+    end = std::chrono::steady_clock::now();
+    std::cout << "Cuda BLAS time difference = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
+
+    // Inverse DCT
+    vector<Mat> Dc;
+    for (Mat Vti : Vcdct) {
+        Mat Di;
+        idct(Vti, Di);
+        Dc.push_back(Di);
+    }
+
+    Mat Icd = cv::Mat::zeros(512, 512, CV_32F);
+    assembleBlocks(Dc, Icd, n);
+    Icd.convertTo(Icd, CV_8U, 255.0);
+    imshow("Cuda Watermarked", Icd);
 
     waitKey(0);
     return 0;
