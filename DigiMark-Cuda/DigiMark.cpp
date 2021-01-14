@@ -3,6 +3,8 @@
 #include <opencv2/highgui.hpp>
 #include <iostream>
 
+#include <chrono>
+
 #include "Watermarking_CUDA.h"
 
 using namespace cv;
@@ -116,10 +118,42 @@ int main(int argc, char** argv)
     Mat I;
     processImageFromFile(I, argv[1]);
 
-    // Create Watermark
+    // Create Watermark (Serial)
     int n = 8;
     Mat W;
+
+    std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     createWatermark(W, n);
+    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+    std::cout << "Serial time difference = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[탎]" << std::endl;
+
+    // Create Watermark (Cuda Host API)
+    int dim = n * n;
+    std::vector<float> host_array(dim);
+
+    begin = std::chrono::steady_clock::now();
+    CalcRandWithHostAPI(host_array.data(), host_array.size());
+    end = std::chrono::steady_clock::now();
+    std::cout << "Cuda time difference = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[탎]" << std::endl;
+
+    // Create Watermark (Cuda Device API)
+    std::vector<float> dev_array(dim);
+
+    begin = std::chrono::steady_clock::now();
+    CalcRandWithDevAPI(dev_array.data(), dev_array.size());
+    end = std::chrono::steady_clock::now();
+    std::cout << "Cuda time difference = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[탎]" << std::endl;
+
+    //std::chrono::steady_clock::time_point beg = std::chrono::steady_clock::now();
+    //CudaRandom(matArray.data(), matArray.size());
+    //std::chrono::steady_clock::time_point en = std::chrono::steady_clock::now();
+    //std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::microseconds>(en - beg).count() << "[탎]" << std::endl;
+
+    Mat host_api_mat = Mat(n, n, CV_32FC1, (float*)host_array.data());
+    Mat dev_api_mat = Mat(n, n, CV_32FC1, (float*)dev_array.data());
+    imshow("Host random", W);
+    imshow("HostAPI random", host_api_mat);
+    imshow("DevAPI random", dev_api_mat);
 
     // Write into file, png conversion
     Mat Iw;
@@ -153,7 +187,13 @@ int main(int argc, char** argv)
         int col_num = i % n;
         float w = W.at<float>(row_num, col_num);
         placeWatermark(Vdct[i], w);
+        //std::vector<float> array(Vdct[i].rows * Vdct[i].cols * Vdct[i].channels());
+        //array = (float)Vdct[i].data;
+        //CudaWatermark(array, );
+    
     }
+
+
 
     // Inverse dct
     vector<Mat> D;
