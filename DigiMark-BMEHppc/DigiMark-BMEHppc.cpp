@@ -115,6 +115,10 @@ int main(int argc, char** argv)
     Mat I;
     processImageFromFile(I, argv[1]);
 
+    vector<float> Data;
+    Data.assign((float*)I.datastart, (float*)I.dataend);
+
+
     // Create Watermark
     int n = 8;
     Mat W;
@@ -142,7 +146,9 @@ int main(int argc, char** argv)
     // Reassemble DCT
     Mat Idct = cv::Mat::zeros(512, 512, CV_32F);
     assembleBlocks(Vdct, Idct, n);
-    imwrite("dcts.png", Idct);
+    Mat Iwdct;
+    Idct.convertTo(Iwdct, CV_8U, 255.0);
+    imwrite("dcts.png", Iwdct);
 
     // Place the Watermark in the most significant bits
     // This is not a good algorithm, since we replace bits, instead 

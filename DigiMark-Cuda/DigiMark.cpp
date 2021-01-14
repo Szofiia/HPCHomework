@@ -134,7 +134,7 @@ int main(int argc, char** argv)
     begin = std::chrono::steady_clock::now();
     CalcRandWithHostAPI(host_array.data(), host_array.size());
     end = std::chrono::steady_clock::now();
-    std::cout << "Cuda time difference = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[탎]" << std::endl;
+    std::cout << "Cuda HostAPI time difference = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[탎]" << std::endl;
 
     // Create Watermark (Cuda Device API)
     std::vector<float> dev_array(dim);
@@ -142,12 +142,7 @@ int main(int argc, char** argv)
     begin = std::chrono::steady_clock::now();
     CalcRandWithDevAPI(dev_array.data(), dev_array.size());
     end = std::chrono::steady_clock::now();
-    std::cout << "Cuda time difference = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[탎]" << std::endl;
-
-    //std::chrono::steady_clock::time_point beg = std::chrono::steady_clock::now();
-    //CudaRandom(matArray.data(), matArray.size());
-    //std::chrono::steady_clock::time_point en = std::chrono::steady_clock::now();
-    //std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::microseconds>(en - beg).count() << "[탎]" << std::endl;
+    std::cout << "Cuda DevAPI time difference = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[탎]" << std::endl;
 
     Mat host_api_mat = Mat(n, n, CV_32FC1, (float*)host_array.data());
     Mat dev_api_mat = Mat(n, n, CV_32FC1, (float*)dev_array.data());
@@ -177,7 +172,10 @@ int main(int argc, char** argv)
     // Reassemble DCT
     Mat Idct = cv::Mat::zeros(512, 512, CV_32F);
     assembleBlocks(Vdct, Idct, n);
-    imwrite("dcts.png", Idct);
+
+    Mat Iwdct;
+    Idct.convertTo(Iwdct, CV_8U, 255.0);
+    imwrite("dcts.png", Iwdct);
 
     // Place the Watermark in the most significant bits
     // This is not a good algorithm, since we replace bits, instead 
@@ -187,13 +185,7 @@ int main(int argc, char** argv)
         int col_num = i % n;
         float w = W.at<float>(row_num, col_num);
         placeWatermark(Vdct[i], w);
-        //std::vector<float> array(Vdct[i].rows * Vdct[i].cols * Vdct[i].channels());
-        //array = (float)Vdct[i].data;
-        //CudaWatermark(array, );
-    
     }
-
-
 
     // Inverse dct
     vector<Mat> D;
@@ -210,5 +202,4 @@ int main(int argc, char** argv)
 
     waitKey(0);
     return 0;
-
 }
